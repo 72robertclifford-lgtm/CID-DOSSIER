@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dossier — CID</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <span class="nav-logo">⚖ CID</span>
+    <div class="nav-tabs">
+      <a href="index.html" class="nav-tab">Accueil</a>
+      <a href="dossier.html" class="nav-tab active">DOSSIER</a>
+    </div>
+  </nav>
+
+  <main class="dossier-page">
+    <div class="doc-header">
+      <h1>★ Crime Investigation Division ★</h1>
+      <h2>Déposition / Interrogatoire</h2>
+    </div>
+
+    <form class="doc-form" id="interrogatoire-form">
+
+      <!-- Infos groupe -->
+      <section class="doc-section">
+        <div class="field-row">
+          <label>Nom du groupe</label>
+          <input type="text" name="nom_groupe" placeholder="Nom du groupe" />
+        </div>
+        <div class="field-row">
+          <label>Localisation exacte ou approximative</label>
+          <input type="text" name="localisation" placeholder="Adresse / zone" />
+        </div>
+        <div class="field-row">
+          <label>Véhicule du groupe</label>
+          <input type="text" name="vehicule" placeholder="Marque, couleur…" />
+        </div>
+        <div class="field-row">
+          <label>Signe vestimentaire distinctif</label>
+          <input type="text" name="vestimentaire" placeholder="Couleur, logo…" />
+        </div>
+        <div class="field-row">
+          <label>Activités illégales connues</label>
+          <textarea name="activites" rows="3" placeholder="Trafic, extorsion…"></textarea>
+        </div>
+        <div class="field-row">
+          <label>Localisation de locaux d'autres groupes et de production de drogue</label>
+          <textarea name="locaux" rows="3" placeholder="Adresses connues…"></textarea>
+        </div>
+      </section>
+
+      <!-- Pied de section 1 -->
+      <section class="doc-section footer-info">
+        <div class="field-inline">
+          <span>Fait à</span>
+          <input type="text" name="lieu" placeholder="Lieu" />
+          <span>, Le</span>
+          <input type="date" name="date_fait" />
+        </div>
+        <div class="field-inline">
+          <span>Détective :</span>
+          <input type="text" name="detective_id" placeholder="XX" class="short" />
+          <span>|</span>
+          <input type="text" name="detective_nom" placeholder="Prénom Nom" />
+        </div>
+        <div class="field-inline">
+          <span>Dépositaire :</span>
+          <input type="text" name="depositaire" placeholder="Prénom Nom" />
+        </div>
+      </section>
+
+      <hr class="doc-hr" />
+
+      <!-- Infos contact -->
+      <section class="doc-section">
+        <div class="field-row">
+          <label>Mail</label>
+          <input type="email" name="mail" placeholder="exemple@mail.com" />
+        </div>
+        <div class="field-row">
+          <label>Téléphone</label>
+          <div class="field-inline">
+            <span>555-</span>
+            <input type="text" name="telephone" placeholder="XXXX" class="short" />
+          </div>
+        </div>
+        <div class="field-row checkboxes">
+          <div class="check-item">
+            <label>Perquisition téléphonique :</label>
+            <label><input type="radio" name="perquisition" value="Oui" /> Oui</label>
+            <label><input type="radio" name="perquisition" value="Non" checked /> Non</label>
+          </div>
+          <div class="check-item">
+            <label>Présence avocat :</label>
+            <input type="text" name="avocat" value="L'individu renonce à ce droit" />
+          </div>
+        </div>
+        <div class="field-row">
+          <label>Heure de début de l'interrogatoire</label>
+          <input type="time" name="heure_debut" />
+        </div>
+      </section>
+
+      <!-- Questions / Réponses -->
+      <section class="doc-section qr-section">
+        <div id="qr-list">
+          <div class="qr-pair">
+            <div class="field-row">
+              <label>Question :</label>
+              <input type="text" name="q[]" placeholder="…" />
+            </div>
+            <div class="field-row">
+              <label>Réponse :</label>
+              <textarea name="r[]" rows="2" placeholder="…"></textarea>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn-add" onclick="addQR()">+ Ajouter Question / Réponse</button>
+      </section>
+
+      <section class="doc-section">
+        <div class="field-row">
+          <label>Heure de fin de l'interrogatoire</label>
+          <input type="time" name="heure_fin" />
+        </div>
+      </section>
+
+      <!-- Cordialement -->
+      <section class="doc-section signature-section">
+        <p class="cordial">Cordialement,</p>
+        <div class="field-inline">
+          <input type="text" name="sig_id" placeholder="XX" class="short" />
+          <span>| Détective CID</span>
+          <input type="text" name="sig_nom" placeholder="Nom Prénom" />
+        </div>
+        <div class="field-row">
+          <label>Signature</label>
+          <canvas id="signature-pad" width="400" height="100"></canvas>
+          <button type="button" class="btn-clear" onclick="clearSig()">Effacer</button>
+        </div>
+      </section>
+
+      <div class="form-actions">
+        <button type="button" class="btn-print" onclick="window.print()">Imprimer</button>
+        <button type="reset" class="btn-reset">Réinitialiser</button>
+      </div>
+
+    </form>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
