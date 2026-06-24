@@ -2566,6 +2566,7 @@ window.addEventListener('load', async () => {
             renderUserHeader();
             showQuickAdminBtn();
             try { await loadDocEditors(); } catch(e){}
+            try { await loadDocumentsFromSupabase(); } catch(e){}
             await renderDossiersList();
 
         } else if (acc && acc.status !== 'approved') {
@@ -2577,6 +2578,7 @@ window.addEventListener('load', async () => {
             renderUserHeader();
             showQuickAdminBtn();
             try { await loadDocEditors(); } catch(e){}
+            try { await loadDocumentsFromSupabase(); } catch(e){}
             await renderDossiersList();
         }
     } catch(e) {
@@ -4820,11 +4822,40 @@ async function syncOrgGradesFromAccounts() {
 }
 
 // ===== DOCUMENTS CID =====
+let _cidDocumentsCache = null;
+
 function getDocuments() {
-    return JSON.parse(localStorage.getItem('cid_documents') || '[]');
+    if (_cidDocumentsCache !== null) return _cidDocumentsCache;
+    try { _cidDocumentsCache = JSON.parse(localStorage.getItem('cid_documents') || '[]'); } catch(e) { _cidDocumentsCache = []; }
+    return _cidDocumentsCache;
 }
-function saveDocuments(docs) {
+
+async function loadDocumentsFromSupabase() {
+    try {
+        const rows = await sbFetch('org_settings?key=eq.cid_documents&select=value');
+        if (rows && rows[0]) {
+            _cidDocumentsCache = JSON.parse(rows[0].value || '[]');
+            localStorage.setItem('cid_documents', rows[0].value);
+            return;
+        }
+    } catch(e) {}
+    // Fallback localStorage
+    try { _cidDocumentsCache = JSON.parse(localStorage.getItem('cid_documents') || '[]'); } catch(e) { _cidDocumentsCache = []; }
+}
+
+async function saveDocuments(docs) {
+    _cidDocumentsCache = docs;
     localStorage.setItem('cid_documents', JSON.stringify(docs));
+    try {
+        await fetch(`${SUPABASE_URL}/rest/v1/org_settings?key=eq.cid_documents`, {
+            method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        await fetch(`${SUPABASE_URL}/rest/v1/org_settings`, {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ key: 'cid_documents', value: JSON.stringify(docs) })
+        });
+    } catch(e) {}
 }
 
 function openDocLink(type, id) {
@@ -4943,15 +4974,15 @@ function openAddDocument(existingIdx) {
 
 function editDocument(idx) { openAddDocument(idx); }
 
-function deleteDocument(idx) {
+async function deleteDocument(idx) {
     if (!confirm('Supprimer ce lien ?')) return;
     const docs = getDocuments();
     docs.splice(idx, 1);
-    saveDocuments(docs);
+    await saveDocuments(docs);
     renderDocumentsTab();
 }
 
-function saveDocument() {
+async function saveDocument() {
     const docs = getDocuments();
     const idx = document.getElementById('docModalIdx').value;
     const linkType = document.getElementById('docLinkType') ? document.getElementById('docLinkType').value : 'external';
@@ -4966,7 +4997,7 @@ function saveDocument() {
     if (!doc.title || !doc.url) return alert('Titre et URL requis !');
     if (!doc.url.startsWith('http')) doc.url = 'https://' + doc.url;
     if (idx !== '') { docs[parseInt(idx)] = doc; } else { docs.push(doc); }
-    saveDocuments(docs);
+    await saveDocuments(docs);
     document.getElementById('docModal').style.display = 'none';
     renderDocumentsTab();
 }
