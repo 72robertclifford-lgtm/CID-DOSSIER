@@ -6508,7 +6508,16 @@ async function _doCreateRapport(name) {
     renderMainRapportTab();
 }
 
-function openRapport(id) { currentRapportId = id; renderMainRapportTab(); }
+function openRapport(id) {
+    currentRapportId = id;
+    renderMainRapportTab();
+    setTimeout(() => {
+        document.querySelectorAll('#mainRapportContent textarea').forEach(ta => {
+            ta.style.height = 'auto';
+            ta.style.height = ta.scrollHeight + 'px';
+        });
+    }, 100);
+}
 function closeRapport() { saveCidRapports(); currentRapportId = null; renderMainRapportTab(); }
 
 async function renameRapport(id) {
@@ -6667,16 +6676,17 @@ function renderRapportEditor(container) {
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
                     <div>
                         <label style="font-size:14px;font-weight:800;color:var(--text);display:block;margin-bottom:4px;">Fait à (lieu)</label>
-                        <input type="text" value="${rapEsc(f.lieu)}" ${dis} oninput="rapField('${id}','lieu',this.value)" placeholder="Ex: Sandy Shores" style="${inp}">
+                        <input type="text" value="${rapEsc(f.lieu)}" ${dis} oninput="rapField('${id}','lieu',this.value);rapMarkField('${id}','lieu');this.nextElementSibling&&(this.nextElementSibling.outerHTML=rapMetaLabel(cidRapports.find(r=>r.id==='${id}'),'lieu'))" placeholder="Ex: Sandy Shores" style="${inp}">
                     </div>
                     <div>
                         <label style="font-size:14px;font-weight:800;color:var(--text);display:block;margin-bottom:4px;">Heure</label>
-                        <input type="time" value="${rapEsc(f.heure)}" ${dis} oninput="rapField('${id}','heure',this.value)" style="${inp}">
+                        <input type="time" value="${rapEsc(f.heure)}" ${dis} oninput="rapField('${id}','heure',this.value);rapMarkField('${id}','heure');this.nextElementSibling&&(this.nextElementSibling.outerHTML=rapMetaLabel(cidRapports.find(r=>r.id==='${id}'),'heure'))" style="${inp}">
                     </div>
                 </div>
                 <div>
                     <label style="font-size:14px;font-weight:800;color:var(--text);display:block;margin-bottom:4px;">Objet du rapport</label>
-                    <input type="text" value="${rapEsc(f.objet)}" ${dis} oninput="rapField('${id}','objet',this.value)" placeholder="Ex: Rapport d'Investigation Youngs" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-weight:700;background:var(--input-bg);color:var(--text);">
+                    <input type="text" value="${rapEsc(f.objet)}" ${dis} oninput="rapField('${id}','objet',this.value);rapMarkField('${id}','objet');this.nextElementSibling&&(this.nextElementSibling.outerHTML=rapMetaLabel(cidRapports.find(r=>r.id==='${id}'),'objet'))" placeholder="Ex: Rapport d'Investigation Youngs" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-weight:700;background:var(--input-bg);color:var(--text);">
+                    ${rapMetaLabel(rap,'objet')}
                 </div>
             </div>
 
@@ -6689,7 +6699,8 @@ function renderRapportEditor(container) {
                 ${f.agents.map((agent, ai) => `
                 <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
                     <span style="color:#C9A227;font-weight:700;font-size:13px;min-width:16px;">•</span>
-                    <input type="text" value="${rapEsc(agent)}" ${dis} oninput="rapAgent('${id}',${ai},this.value)" placeholder="Grade | Prénom Nom" style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:15px;font-weight:700;background:var(--input-bg);color:var(--text);">
+                    <input type="text" value="${rapEsc(agent)}" ${dis} oninput="rapAgent('${id}',${ai},this.value);rapMarkField('${id}','agent_'+${ai});this.nextElementSibling&&(this.nextElementSibling.outerHTML=rapMetaLabel(cidRapports.find(r=>r.id==='${id}'),'agent_'+${ai}))" placeholder="Grade | Prénom Nom" style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:15px;font-weight:700;background:var(--input-bg);color:var(--text);">
+                        ${rapMetaLabel(rap,'agent_'+ai)}
                     ${canWrite && f.agents.length > 1 ? `<button onclick="rapDelAgent('${id}',${ai})" style="background:rgba(211,47,47,0.1);color:#d32f2f;border:1px solid rgba(211,47,47,0.2);padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;">✕</button>` : ''}
                 </div>`).join('')}
             </div>
@@ -6699,10 +6710,11 @@ function renderRapportEditor(container) {
                 ${rapGetBlocs(rap).map((bloc, bi) => `
                 <div style="background:rgba(13,43,94,0.05);border-radius:10px;padding:16px;margin-bottom:12px;border:1px solid rgba(201,162,39,0.1);">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px;">
-                        <input type="text" value="${rapEsc(bloc.titre)}" ${dis} oninput="rapBlocField('${id}',${bi},'titre',this.value)" placeholder="Titre du bloc (ex: Description des faits)" style="flex:1;padding:8px 14px;border:none;border-bottom:2px solid rgba(201,162,39,0.5);border-radius:0;font-size:16px;font-weight:800;background:transparent;color:#C9A227;letter-spacing:0.8px;text-transform:uppercase;">
+                        <input type="text" value="${rapEsc(bloc.titre)}" ${dis} oninput="rapBlocField('${id}',${bi},'titre',this.value);rapMarkField('${id}','bloc_titre_'+${bi})" placeholder="Titre du bloc (ex: Description des faits)" style="flex:1;padding:8px 14px;border:none;border-bottom:2px solid rgba(201,162,39,0.5);border-radius:0;font-size:16px;font-weight:800;background:transparent;color:#C9A227;letter-spacing:0.8px;text-transform:uppercase;">
                         ${canWrite && rapGetBlocs(rap).length > 1 ? `<button onclick="rapDelBloc('${id}',${bi})" style="background:rgba(211,47,47,0.1);color:#d32f2f;border:1px solid rgba(211,47,47,0.2);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">✕ Suppr.</button>` : ''}
                     </div>
-                    <textarea ${dis} oninput="rapBlocField('${id}',${bi},'texte',this.value)" placeholder="Décrivez les faits en détail..." style="width:100%;min-height:120px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-weight:600;background:var(--input-bg);color:var(--text);resize:vertical;line-height:1.8;margin-bottom:12px;">${rapEsc(bloc.texte)}</textarea>
+                    <textarea ${dis} oninput="rapBlocField('${id}',${bi},'texte',this.value);rapMarkField('${id}','bloc_texte_'+${bi});this.style.height='auto';this.style.height=this.scrollHeight+'px'" placeholder="Décrivez les faits en détail..." style="width:100%;min-height:120px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-weight:600;background:var(--input-bg);color:var(--text);resize:none;line-height:1.8;margin-bottom:12px;overflow:hidden;">${rapEsc(bloc.texte)}</textarea>
+                    ${rapMetaLabel(rap,'bloc_texte_'+bi)}
                     ${canWrite ? `
                     <div class="dropzone" ondrop="rapDropPhoto('${id}',${bi},event)" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" onclick="this.querySelector('input').click()" style="margin-bottom:10px;">
                         <div class="dropzone-text">📸 Glissez vos photos ici</div>
@@ -6969,6 +6981,21 @@ document.addEventListener('click', e => {
     const inp = document.getElementById('editorUsernameInput');
     if (box && inp && !inp.contains(e.target) && !box.contains(e.target)) box.style.display = 'none';
 });
+
+// ===== MÉTADONNÉES RAPPORTS =====
+function rapMarkField(rapId, key) {
+    const rap = cidRapports.find(r => r.id === rapId);
+    if (!rap) return;
+    if (!rap.field_meta) rap.field_meta = {};
+    rap.field_meta[key] = { by: currentUser ? currentUser.username : '?', at: now() };
+}
+
+function rapMetaLabel(rap, key) {
+    if (!rap || !rap.field_meta) return '';
+    const m = rap.field_meta[key];
+    if (!m) return '';
+    return `<span class="field-meta">✏️ @${m.by} — ${m.at}</span>`;
+}
 
 // ===== ACCÈS PAR LIEN — RAPPORTS =====
 let _rapportAccess = {};
