@@ -1596,7 +1596,7 @@ async function doLogin() {
         localStorage.setItem('cid_session', JSON.stringify(currentUser));
         showPage('pageDossiers');
         renderUserHeader();
-        setTimeout(async () => { try { await loadOrgMembersFromSupabase(); } catch(e){} try { await loadDocEditors(); } catch(e){} renderUserHeader(); renderDossiersList(); renderInlineOrg(); try { syncOrgGradesFromAccounts(); } catch(e){} const docTab = document.getElementById('tabDocuments'); if(docTab) docTab.style.display = getPermLevel() === 'procureur' ? 'none' : ''; }, 300);
+        setTimeout(async () => { try { await loadOrgMembersFromSupabase(); } catch(e){} try { await loadDocEditors(); } catch(e){} try { await loadDocumentsFromSupabase(); } catch(e){} renderUserHeader(); renderDossiersList(); renderInlineOrg(); try { syncOrgGradesFromAccounts(); } catch(e){} const docTab = document.getElementById('tabDocuments'); if(docTab) docTab.style.display = getPermLevel() === 'procureur' ? 'none' : ''; try { const savedTab = sessionStorage.getItem('cid_active_tab'); if (savedTab && savedTab !== 'dossiers') setTimeout(() => switchMainTab(savedTab), 400); } catch(e){} }, 300);
         setTimeout(() => checkPendingLink(), 300);
     } catch(e) { showMsg('loginMsg','Erreur: ' + e.message,'error'); }
 }
@@ -4529,6 +4529,8 @@ function switchMainTab(tab) {
     if (tab === 'documents') renderDocumentsTab();
     if (tab === 'deposition') { currentDepositionId = null; renderMainDepositionTab(); }
     if (tab === 'rapport') { currentRapportId = null; renderMainRapportTab(); }
+    // Sauvegarder l'onglet actif pour le restaurer au refresh
+    try { sessionStorage.setItem('cid_active_tab', tab); } catch(e) {}
 
     const docTab = document.getElementById('tabDocuments');
     if (docTab) docTab.style.display = getPermLevel() === 'procureur' ? 'none' : '';
@@ -6173,12 +6175,17 @@ async function deleteDeposition(id) {
     const i = cidDepositions.findIndex(d => d.id === id);
     if (i >= 0) cidDepositions.splice(i, 1);
     if (currentDepositionId === id) currentDepositionId = null;
+    // Sauvegarder ET invalider le cache pour forcer un vrai reload
+    cidDepositionsLoaded = false;
+    _interroLastHash = null;
     await saveCidDepositions();
+    cidDepositionsLoaded = true;
     renderMainDepositionTab();
 }
 
 // ---- Mise à jour des champs (autosave) ----
 function depField(id, field, value) {
+    _lastInterroEditTime = Date.now();
     const dep = cidDepositions.find(d => d.id === id);
     if (!dep) return;
     dep.form[field] = value;
@@ -6186,6 +6193,7 @@ function depField(id, field, value) {
     saveCidDepositions();
 }
 function depQR(id, qi, key, value) {
+    _lastInterroEditTime = Date.now();
     const dep = cidDepositions.find(d => d.id === id);
     if (!dep || !dep.form.qr[qi]) return;
     dep.form.qr[qi][key] = value;
@@ -6408,8 +6416,12 @@ function _hashInterro(dep) {
     return JSON.stringify(dep).length + '_' + (dep.modified_at || '');
 }
 
+let _lastInterroEditTime = 0;
+
 async function _pollInterroUpdates() {
     if (!currentDepositionId) { stopInterroPolling(); return; }
+    // Ne pas écraser si l'utilisateur a modifié dans les 20 dernières secondes
+    if (Date.now() - _lastInterroEditTime < 20000) return;
     try {
         const rows = await sbFetch('org_settings?key=eq.cid_depositions&select=value');
         if (!rows || !rows[0]) return;
@@ -6421,7 +6433,6 @@ async function _pollInterroUpdates() {
         const remoteHash = _hashInterro(remoteDep);
         const localHash = localDep ? _hashInterro(localDep) : null;
 
-        // Si différent ET que c'est pas nous qui venons de modifier (autosave < 5s)
         if (remoteHash !== _interroLastHash && remoteHash !== localHash) {
             // Mettre à jour les données locales
             const idx = cidDepositions.findIndex(d => d.id === currentDepositionId);
