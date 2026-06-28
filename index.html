@@ -6019,6 +6019,11 @@ async function saveCidDepositions() {
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
             body: JSON.stringify({ key: 'cid_depositions', value: JSON.stringify(cidDepositions) })
         });
+        // Mettre à jour le hash local pour ne pas se re-rendre soi-même
+        if (currentDepositionId) {
+            const dep = cidDepositions.find(d => d.id === currentDepositionId);
+            if (dep) _interroLastHash = _hashInterro(dep);
+        }
     } catch(e) {}
 }
 
@@ -6115,7 +6120,18 @@ async function _doCreateDeposition(trimmed) {
     renderMainDepositionTab();
 }
 
-function openDeposition(id) { currentDepositionId = id; renderMainDepositionTab(); startInterroAutosave(id); startInterroPolling(id); }
+function openDeposition(id) {
+    currentDepositionId = id;
+    renderMainDepositionTab();
+    startInterroAutosave(id);
+    startInterroPolling(id);
+    setTimeout(() => {
+        document.querySelectorAll('#mainDepositionContent textarea').forEach(ta => {
+            ta.style.height = 'auto';
+            ta.style.height = ta.scrollHeight + 'px';
+        });
+    }, 100);
+}
 function closeDeposition() { stopInterroAutosave(); stopInterroPolling(); saveCidDepositions(); currentDepositionId = null; renderMainDepositionTab(); }
 
 async function renameDeposition(id) {
@@ -6270,7 +6286,11 @@ function renderDepositionEditor(container) {
             <div style="margin-bottom:16px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
                     <div style="font-size:10px;color:#C9A227;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;">Questions / Réponses <span style="opacity:0.6;font-size:9px;">(${f.qr.length})</span></div>
-                    ${canWrite?`<button onclick="depAddQR('${id}')" style="background:linear-gradient(135deg,#C9A227,#e0b830);color:#0D2B5E;border:none;padding:7px 16px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:800;">+ Ajouter une question</button>`:''}
+                    <div style="display:flex;gap:6px;">
+                        <button onclick="copyAllQR('${id}')" style="background:rgba(13,43,94,0.3);color:#C9A227;border:1px solid rgba(201,162,39,0.3);padding:7px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;">📋 Copier les Q/R</button>
+                        ${canWrite?`<button onclick="pasteAllQR('${id}')" style="background:rgba(13,43,94,0.3);color:#C9A227;border:1px solid rgba(201,162,39,0.3);padding:7px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;">📥 Coller les Q/R</button>`:''}
+                        ${canWrite?`<button onclick="depAddQR('${id}')" style="background:linear-gradient(135deg,#C9A227,#e0b830);color:#0D2B5E;border:none;padding:7px 16px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:800;">+ Ajouter une question</button>`:''}
+                    </div>
                 </div>
                 ${f.qr.map((item, qi) => `
                 <div style="border-left:3px solid rgba(201,162,39,0.3);padding:12px;margin-bottom:10px;background:rgba(13,43,94,0.04);border-radius:0 8px 8px 0;">
@@ -6278,9 +6298,9 @@ function renderDepositionEditor(container) {
                         <div style="font-size:11px;font-weight:800;color:#C9A227;">Question ${qi+1}</div>
                         ${canWrite&&f.qr.length>1?`<button onclick="depDelQR('${id}',${qi})" style="background:rgba(211,47,47,0.08);color:#d32f2f;border:1px solid rgba(211,47,47,0.15);padding:2px 8px;border-radius:5px;cursor:pointer;font-size:10px;">✕</button>`:''}
                     </div>
-                    <textarea ${dis} oninput="depQR('${id}',${qi},'q',this.value)" placeholder="Question..." style="width:100%;min-height:45px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);resize:vertical;margin-bottom:6px;">${depEsc(item.q)}</textarea>
+                    <textarea ${dis} oninput="depQR('${id}',${qi},'q',this.value);this.style.height='auto';this.style.height=this.scrollHeight+'px'" placeholder="Question..." style="width:100%;min-height:45px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);resize:none;overflow:hidden;margin-bottom:6px;">${depEsc(item.q)}</textarea>
                     <div style="font-size:11px;font-weight:800;color:var(--text2);margin-bottom:6px;">Réponse</div>
-                    <textarea ${dis} oninput="depQR('${id}',${qi},'r',this.value)" placeholder="Réponse..." style="width:100%;min-height:55px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);resize:vertical;">${depEsc(item.r)}</textarea>
+                    <textarea ${dis} oninput="depQR('${id}',${qi},'r',this.value);this.style.height='auto';this.style.height=this.scrollHeight+'px'" placeholder="Réponse..." style="width:100%;min-height:55px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);resize:none;overflow:hidden;">${depEsc(item.r)}</textarea>
                 </div>`).join('')}
             </div>
 
@@ -6445,12 +6465,50 @@ function showInterroUpdateNotif() {
 function startInterroPolling(id) {
     stopInterroPolling();
     _interroLastHash = null;
-    _interroPollingInterval = setInterval(_pollInterroUpdates, 30000);
+    _interroPollingInterval = setInterval(_pollInterroUpdates, 10000);
 }
 
 function stopInterroPolling() {
     if (_interroPollingInterval) { clearInterval(_interroPollingInterval); _interroPollingInterval = null; }
     _interroLastHash = null;
+}
+
+// ===== COPIER / COLLER Q/R INTERROGATOIRE =====
+let _copiedQR = null;
+
+function copyAllQR(id) {
+    const dep = cidDepositions.find(d => d.id === id);
+    if (!dep || !dep.form.qr || dep.form.qr.length === 0) {
+        showSuccessDossiers('❌ Aucune Q/R à copier');
+        return;
+    }
+    _copiedQR = JSON.parse(JSON.stringify(dep.form.qr));
+    showSuccessDossiers(`📋 ${_copiedQR.length} Q/R copiée(s) — ouvre un autre interrogatoire et colle-les`);
+}
+
+async function pasteAllQR(id) {
+    if (!_copiedQR || _copiedQR.length === 0) {
+        showSuccessDossiers("❌ Rien à coller — copie d'abord les Q/R d'un interrogatoire");
+        return;
+    }
+    const dep = cidDepositions.find(d => d.id === id);
+    if (!dep) return;
+    if (dep.form.qr && dep.form.qr.some(q => q.q || q.r)) {
+        if (!confirm(`Ajouter ${_copiedQR.length} Q/R à cet interrogatoire ? (les Q/R existantes seront conservées)`)) return;
+        dep.form.qr = [...dep.form.qr, ...JSON.parse(JSON.stringify(_copiedQR))];
+    } else {
+        dep.form.qr = JSON.parse(JSON.stringify(_copiedQR));
+    }
+    dep.modified_at = new Date().toLocaleDateString('fr-FR');
+    await saveCidDepositions();
+    renderMainDepositionTab();
+    setTimeout(() => {
+        document.querySelectorAll('#mainDepositionContent textarea').forEach(ta => {
+            ta.style.height = 'auto';
+            ta.style.height = ta.scrollHeight + 'px';
+        });
+    }, 100);
+    showSuccessDossiers(`✅ ${_copiedQR.length} Q/R collée(s) avec succès`);
 }
 
 // ===== SAUVEGARDE INTERROGATOIRE =====
@@ -6472,7 +6530,7 @@ async function saveInterroNow(id) {
 
 function startInterroAutosave(id) {
     stopInterroAutosave();
-    interroAutosaveInterval = setInterval(() => saveCidDepositions(), 30000);
+    interroAutosaveInterval = setInterval(() => saveCidDepositions(), 5000);
 }
 
 function stopInterroAutosave() {
