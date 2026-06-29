@@ -1353,15 +1353,10 @@
             <p style="color:var(--text3);font-size:12px;margin:-8px 0 14px;">Ces utilisateurs peuvent modifier ce document mais pas le supprimer.</p>
             <div id="editorsListContainer" style="margin-bottom:14px;min-height:40px;"></div>
             <div id="editorsAddRow" style="margin-bottom:16px;">
-                <div style="position:relative;">
-                    <input type="text" id="editorUsernameInput" placeholder="Chercher un compte..." autocomplete="off"
-                        style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--input-bg);color:var(--text);box-sizing:border-box;"
-                        oninput="filterEditorSuggestions(this.value)"
-                        onkeydown="if(event.key==='Enter')addEditor()"
-                        onfocus="filterEditorSuggestions(this.value)">
-                    <div id="editorSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid rgba(201,162,39,0.25);border-radius:0 0 8px 8px;max-height:160px;overflow-y:auto;z-index:100;box-shadow:0 6px 16px rgba(0,0,0,0.2);"></div>
-                </div>
-                <button onclick="addEditor()" style="width:100%;margin-top:8px;padding:9px;background:linear-gradient(135deg,#42a5f5,#1e88e5);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">+ Ajouter</button>
+                <select id="editorUsernameInput" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--input-bg);color:var(--text);margin-bottom:8px;">
+                    <option value="">-- Choisir un compte --</option>
+                </select>
+                <button onclick="addEditor()" style="width:100%;padding:9px;background:linear-gradient(135deg,#42a5f5,#1e88e5);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">+ Ajouter</button>
             </div>
             <button onclick="closeEditorsModal()" style="width:100%;padding:11px;background:transparent;color:var(--text3);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-weight:600;">Fermer</button>
         </div>
@@ -2582,6 +2577,11 @@ window.addEventListener('load', async () => {
             try { await loadDocEditors(); } catch(e){}
             try { await loadDocumentsFromSupabase(); } catch(e){}
             await renderDossiersList();
+            // Restaurer l'onglet actif
+            try {
+                const _savedTab = sessionStorage.getItem('cid_active_tab');
+                if (_savedTab && _savedTab !== 'dossiers') setTimeout(() => switchMainTab(_savedTab), 300);
+            } catch(e) {}
 
         } else if (acc && acc.status !== 'approved') {
             localStorage.removeItem('cid_session');
@@ -2594,6 +2594,10 @@ window.addEventListener('load', async () => {
             try { await loadDocEditors(); } catch(e){}
             try { await loadDocumentsFromSupabase(); } catch(e){}
             await renderDossiersList();
+            try {
+                const _savedTab = sessionStorage.getItem('cid_active_tab');
+                if (_savedTab && _savedTab !== 'dossiers') setTimeout(() => switchMainTab(_savedTab), 300);
+            } catch(e) {}
         }
     } catch(e) {
         console.error('Session restore error:', e);
@@ -6142,6 +6146,7 @@ function openDeposition(id) {
             ta.style.height = 'auto';
             ta.style.height = ta.scrollHeight + 'px';
         });
+        if (currentDepositionId) populateDetectiveSelect(currentDepositionId);
     }, 100);
 }
 function closeDeposition() { stopInterroAutosave(); stopInterroPolling(); saveCidDepositions(); currentDepositionId = null; renderMainDepositionTab(); }
@@ -6232,7 +6237,7 @@ function depDelQR(id, qi) {
 function renderDepositionEditor(container) {
     const dep = cidDepositions.find(d => d.id === currentDepositionId);
     if (!dep) { currentDepositionId = null; renderDepositionsList(container); return; }
-    const canWrite = canEdit();
+    const canWrite = canEditDoc('interro', dep.id);
     const f = dep.form || (dep.form = blankDepositionForm());
     if (!f.qr) f.qr = [];
     const id = dep.id;
@@ -6250,88 +6255,111 @@ function renderDepositionEditor(container) {
     </div>
     <div id="interroSaveMsg" style="display:none;background:#d4edda;color:#155724;border:1px solid #c3e6cb;padding:10px 16px;border-radius:8px;margin-bottom:14px;font-weight:600;font-size:13px;"></div>
 
-    <div style="background:var(--bg2);border-radius:14px;border:1px solid rgba(201,162,39,0.2);overflow:hidden;margin-bottom:20px;box-shadow:0 4px 16px rgba(0,0,0,0.1);">
-        <div style="background:linear-gradient(135deg,#0D2B5E,#1a4080);padding:14px 20px;border-bottom:3px solid #C9A227;">
-            <div style="color:rgba(201,162,39,0.7);font-size:10px;letter-spacing:2px;text-transform:uppercase;">— Crime Investigation Division —</div>
-            <div style="color:white;font-size:16px;font-weight:900;margin-top:2px;">${depEsc(dep.name)}</div>
+    <div style="background:var(--bg2);border-radius:16px;overflow:hidden;margin-bottom:20px;box-shadow:0 6px 24px rgba(0,0,0,0.15);border:1px solid rgba(201,162,39,0.15);">
+        <div style="background:linear-gradient(135deg,#0A1F45,#0D2B5E,#163870);padding:20px 24px;border-bottom:2px solid #C9A227;">
+            <div style="color:rgba(201,162,39,0.6);font-size:9px;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px;">— Crime Investigation Division —</div>
+            <div style="color:white;font-size:20px;font-weight:900;">${depEsc(dep.name)}</div>
         </div>
 
-        <div style="padding:20px;">
-            <!-- Questions guide -->
-            <div style="font-size:11px;color:#c0392b;font-style:italic;line-height:2;margin-bottom:18px;padding:12px 16px;background:rgba(192,57,43,0.05);border-radius:8px;border-left:3px solid rgba(192,57,43,0.4);">
-                1. Quel est le nom du groupe auquel vous appartenez ?<br>
-                2. Quelle est votre localisation exacte ou approximative ?<br>
-                3. Quel est le véhicule du groupe — marques et couleurs ?<br>
-                4. Quel est le signe vestimentaire distinctif du groupe ?<br>
-                5. Quelles sont les activités illégales connues de votre groupe ?<br>
-                6. Connaissez-vous la localisation de locaux d'autres groupes et de production de drogue ?
-            </div>
-            <!-- Infos admin -->
-            <div style="background:rgba(13,43,94,0.06);border-radius:10px;padding:16px;margin-bottom:16px;border:1px solid rgba(201,162,39,0.1);">
-                <div style="font-size:10px;color:#C9A227;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;">Informations administratives</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-                    <div><label style="font-size:14px;font-weight:800;color:var(--text);display:block;margin-bottom:4px;">Fait à (lieu)</label>
-                    <input type="text" value="${depEsc(f.faitlieu)}" ${dis} oninput="depField('${id}','faitlieu',this.value)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);"></div>
-                    <div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Le (date)</label>
-                    <input type="date" value="${depEsc(f.faitdate)}" ${dis} oninput="depField('${id}','faitdate',this.value)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);"></div>
-                    <div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Détective (XX | Prénom Nom)</label>
-                    <input type="text" value="${depEsc(f.detective)}" ${dis} oninput="depField('${id}','detective',this.value)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);"></div>
-                    <div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Dépositaire</label>
-                    <input type="text" value="${depEsc(f.depositaire)}" ${dis} oninput="depField('${id}','depositaire',this.value)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);"></div>
-                    <div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Mail</label>
-                    <input type="text" value="${depEsc(f.mail)}" ${dis} oninput="depField('${id}','mail',this.value)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);"></div>
-                    <div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Téléphone</label>
-                    <input type="text" value="${depEsc(f.tel)}" ${dis} oninput="depField('${id}','tel',this.value)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);"></div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-                    <div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Perquisition téléphonique</label>
-                    <select ${dis} onchange="depField('${id}','perqui',this.value)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);">
-                        <option value="Non" ${!f.perqui||f.perqui==='Non'?'selected':''}>Non</option>
-                        <option value="Oui" ${f.perqui==='Oui'?'selected':''}>Oui</option>
-                    </select></div>
-                    <div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Présence avocat</label>
-                    <select ${dis} onchange="depField('${id}','avocat',this.value)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);">
-                        <option value="renonce" ${!f.avocat||f.avocat==='renonce'?'selected':''}>L'individu renonce à ce droit</option>
-                        <option value="present" ${f.avocat==='present'?'selected':''}>Présent</option>
-                        <option value="absent" ${f.avocat==='absent'?'selected':''}>Absent</option>
-                    </select></div>
-                    <div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Heure de début</label>
-                    <input type="time" value="${depEsc(f.hdebut)}" ${dis} oninput="depField('${id}','hdebut',this.value)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);"></div>
-                    <div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Heure de fin</label>
-                    <input type="time" value="${depEsc(f.hfin)}" ${dis} oninput="depField('${id}','hfin',this.value)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);"></div>
+        <div style="padding:24px;">
+            <div style="margin-bottom:22px;padding:14px 18px;background:rgba(192,57,43,0.05);border-radius:10px;border-left:4px solid #c0392b;">
+                <div style="font-size:9px;font-weight:800;color:#c0392b;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Questions à poser</div>
+                <div style="display:flex;flex-direction:column;gap:6px;">
+                    ${['Quel est le nom du groupe auquel vous appartenez ?','Quelle est votre localisation exacte ou approximative ?','Quel est le véhicule du groupe — marques et couleurs ?','Quel est le signe vestimentaire distinctif du groupe ?','Quelles sont les activités illégales connues de votre groupe ?','Connaissez-vous la localisation de locaux d\'autres groupes et de production de drogue ?'].map((q,i)=>`<div style="display:flex;gap:10px;align-items:baseline;"><span style="color:#c0392b;font-weight:800;font-size:12px;min-width:18px;">${i+1}.</span><span style="color:var(--text2);font-size:13px;font-style:italic;">${q}</span></div>`).join('')}
                 </div>
             </div>
 
-            <!-- Q/R -->
+            <div style="background:rgba(13,43,94,0.05);border-radius:12px;padding:18px;margin-bottom:16px;border:1px solid rgba(201,162,39,0.12);">
+                <div style="font-size:11px;color:#C9A227;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px;">📋 Informations administratives</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                    <div><label style="font-size:11px;font-weight:700;color:var(--text3);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.8px;">Fait à (lieu)</label><input type="text" value="${depEsc(f.faitlieu)}" ${dis} oninput="depField('${id}','faitlieu',this.value)" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--input-bg);color:var(--text);"></div>
+                    <div><label style="font-size:11px;font-weight:700;color:var(--text3);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.8px;">Date</label><input type="date" value="${depEsc(f.faitdate)}" ${dis} oninput="depField('${id}','faitdate',this.value)" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--input-bg);color:var(--text);"></div>
+                    <div>
+                        <label style="font-size:11px;font-weight:700;color:var(--text3);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.8px;">Agents concernés</label>
+                        <div id="det-tags-${id}" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+                            ${(f.detective?f.detective.split('\n').filter(d=>d.trim()):[]).map(d=>`
+                            <div style="background:linear-gradient(135deg,rgba(13,43,94,0.4),rgba(13,43,94,0.25));border:1px solid rgba(201,162,39,0.35);border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 6px rgba(0,0,0,0.12);">
+                                <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#0D2B5E,#1a4080);border:2px solid rgba(201,162,39,0.5);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#C9A227;flex-shrink:0;">
+                                    ${depEsc(d).split('|').pop().trim().split(' ').filter(w=>w).map(w=>w[0]).slice(0,2).join('').toUpperCase()}
+                                </div>
+                                <div>
+                                    <div style="font-size:10px;color:rgba(201,162,39,0.7);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">${depEsc(d).split('|')[0]||''}</div>
+                                    <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.2;">${depEsc(d).split('|').slice(1).join('|').trim()||depEsc(d)}</div>
+                                </div>
+                                ${canWrite?`<button onclick="depRemoveDetective('${id}','${depEsc(d)}')" style="background:rgba(211,47,47,0.1);border:1px solid rgba(211,47,47,0.2);color:#ef5350;cursor:pointer;font-size:11px;padding:3px 7px;border-radius:6px;font-weight:700;margin-left:4px;">✕</button>`:''}
+                            </div>`).join('')}
+                        </div>
+                        ${canWrite?`
+                        <div style="position:relative;">
+                            <button onclick="toggleDetDropdown('${id}')" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--input-bg);color:var(--text);text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+                                <span>+ Ajouter des agents...</span><span>▾</span>
+                            </button>
+                            <div id="det-dropdown-${id}" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--bg2);border:1px solid rgba(201,162,39,0.25);border-radius:10px;max-height:220px;overflow-y:auto;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.25);padding:6px;"></div>
+                        </div>
+                        <button onclick="depConfirmDetectives('${id}')" style="width:100%;margin-top:8px;padding:9px;background:linear-gradient(135deg,#C9A227,#e0b830);color:#0D2B5E;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:800;">✅ Confirmer la sélection</button>
+                        `:''}
+                    </div>
+                    <div><label style="font-size:11px;font-weight:700;color:var(--text3);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.8px;">Dépositaire</label><input type="text" value="${depEsc(f.depositaire)}" ${dis} oninput="depField('${id}','depositaire',this.value)" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--input-bg);color:var(--text);"></div>
+                    <div><label style="font-size:11px;font-weight:700;color:var(--text3);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.8px;">Mail</label><input type="text" value="${depEsc(f.mail)}" ${dis} oninput="depField('${id}','mail',this.value)" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--input-bg);color:var(--text);"></div>
+                    <div><label style="font-size:11px;font-weight:700;color:var(--text3);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.8px;">Téléphone</label><input type="text" value="${depEsc(f.tel)}" ${dis} oninput="depField('${id}','tel',this.value)" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--input-bg);color:var(--text);"></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">
+                    <div><label style="font-size:11px;font-weight:700;color:var(--text3);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.8px;">Perquisition tél.</label><select ${dis} onchange="depField('${id}','perqui',this.value)" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--input-bg);color:var(--text);"><option value="Non" ${!f.perqui||f.perqui==='Non'?'selected':''}>Non</option><option value="Oui" ${f.perqui==='Oui'?'selected':''}>Oui</option></select></div>
+                    <div><label style="font-size:11px;font-weight:700;color:var(--text3);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.8px;">Avocat</label><select ${dis} onchange="depField('${id}','avocat',this.value)" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--input-bg);color:var(--text);"><option value="renonce" ${!f.avocat||f.avocat==='renonce'?'selected':''}>Renonce</option><option value="present" ${f.avocat==='present'?'selected':''}>Présent</option><option value="absent" ${f.avocat==='absent'?'selected':''}>Absent</option></select></div>
+                    <div><label style="font-size:11px;font-weight:700;color:var(--text3);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.8px;">Heure début</label><input type="time" value="${depEsc(f.hdebut)}" ${dis} oninput="depField('${id}','hdebut',this.value)" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--input-bg);color:var(--text);"></div>
+                    <div><label style="font-size:11px;font-weight:700;color:var(--text3);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.8px;">Heure fin</label><input type="time" value="${depEsc(f.hfin)}" ${dis} oninput="depField('${id}','hfin',this.value)" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--input-bg);color:var(--text);"></div>
+                </div>
+            </div>
+
             <div style="margin-bottom:16px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-                    <div style="font-size:10px;color:#C9A227;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;">Questions / Réponses <span style="opacity:0.6;font-size:9px;">(${f.qr.length})</span></div>
-                    <div style="display:flex;gap:6px;">
-                        <button onclick="copyAllQR('${id}')" style="background:rgba(13,43,94,0.3);color:#C9A227;border:1px solid rgba(201,162,39,0.3);padding:7px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;">📋 Copier les Q/R</button>
-                        ${canWrite?`<button onclick="pasteAllQR('${id}')" style="background:rgba(13,43,94,0.3);color:#C9A227;border:1px solid rgba(201,162,39,0.3);padding:7px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;">📥 Coller les Q/R</button>`:''}
-                        ${canWrite?`<button onclick="depAddQR('${id}')" style="background:linear-gradient(135deg,#C9A227,#e0b830);color:#0D2B5E;border:none;padding:7px 16px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:800;">+ Ajouter une question</button>`:''}
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                    <div style="font-size:11px;color:#C9A227;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px;margin-bottom:0;">💬 Questions / Réponses <span style="opacity:0.5;font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;">(${f.qr.length})</span></div>
+                    <div style="display:flex;gap:7px;">
+                        <button onclick="copyAllQR('${id}')" style="background:rgba(255,255,255,0.06);color:var(--text2);border:1px solid var(--border);padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">📋 Copier</button>
+                        ${canWrite?`<button onclick="pasteAllQR('${id}')" style="background:rgba(255,255,255,0.06);color:var(--text2);border:1px solid var(--border);padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">📥 Coller</button>`:''}
                     </div>
                 </div>
                 ${f.qr.map((item, qi) => `
-                <div style="border-left:3px solid rgba(201,162,39,0.3);padding:12px;margin-bottom:10px;background:rgba(13,43,94,0.04);border-radius:0 8px 8px 0;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                        <div style="font-size:11px;font-weight:800;color:#C9A227;">Question ${qi+1}</div>
-                        ${canWrite&&f.qr.length>1?`<button onclick="depDelQR('${id}',${qi})" style="background:rgba(211,47,47,0.08);color:#d32f2f;border:1px solid rgba(211,47,47,0.15);padding:2px 8px;border-radius:5px;cursor:pointer;font-size:10px;">✕</button>`:''}
+                <div style="border-radius:12px;margin-bottom:14px;background:rgba(13,43,94,0.06);border:1px solid rgba(201,162,39,0.1);overflow:hidden;">
+                    <div style="background:rgba(13,43,94,0.15);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(201,162,39,0.1);">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span style="background:#C9A227;color:#0D2B5E;font-size:11px;font-weight:900;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;">${qi+1}</span>
+                            <span style="font-size:12px;font-weight:700;color:#C9A227;text-transform:uppercase;letter-spacing:1px;">Question</span>
+                        </div>
+                        ${canWrite&&f.qr.length>1?`<button onclick="depDelQR('${id}',${qi})" style="background:rgba(211,47,47,0.1);color:#ef5350;border:1px solid rgba(211,47,47,0.2);padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">✕ Suppr.</button>`:''}
                     </div>
-                    <textarea ${dis} oninput="depQR('${id}',${qi},'q',this.value);this.style.height='auto';this.style.height=this.scrollHeight+'px'" placeholder="Question..." style="width:100%;min-height:45px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);resize:none;overflow:hidden;margin-bottom:6px;">${depEsc(item.q)}</textarea>
-                    <div style="font-size:11px;font-weight:800;color:var(--text2);margin-bottom:6px;">Réponse</div>
-                    <textarea ${dis} oninput="depQR('${id}',${qi},'r',this.value);this.style.height='auto';this.style.height=this.scrollHeight+'px'" placeholder="Réponse..." style="width:100%;min-height:55px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--text);resize:none;overflow:hidden;">${depEsc(item.r)}</textarea>
+                    <div style="padding:14px;">
+                        <textarea ${dis} oninput="depQR('${id}',${qi},'q',this.value);this.style.height='auto';this.style.height=this.scrollHeight+'px'" placeholder="Posez votre question ici..." style="width:100%;min-height:50px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;background:var(--input-bg);color:var(--text);resize:none;overflow:hidden;margin-bottom:12px;font-weight:600;">${depEsc(item.q)}</textarea>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            <div style="width:3px;height:16px;background:#4caf50;border-radius:2px;"></div>
+                            <span style="font-size:11px;font-weight:700;color:#4caf50;text-transform:uppercase;letter-spacing:1px;">Réponse</span>
+                        </div>
+                        <textarea ${dis} oninput="depQR('${id}',${qi},'r',this.value);this.style.height='auto';this.style.height=this.scrollHeight+'px'" placeholder="Réponse du suspect..." style="width:100%;min-height:60px;padding:10px 12px;border:1px solid rgba(76,175,80,0.25);border-radius:8px;font-size:15px;background:var(--input-bg);color:var(--text);resize:none;overflow:hidden;font-weight:600;">${depEsc(item.r)}</textarea>
+                    </div>
                 </div>`).join('')}
-            </div>
+                ${canWrite?`<button onclick="depAddQR('${id}')" style="width:100%;margin-top:4px;padding:13px;background:linear-gradient(135deg,#C9A227,#e0b830);color:#0D2B5E;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:900;letter-spacing:0.5px;box-shadow:0 3px 10px rgba(201,162,39,0.3);">+ Ajouter une question</button>`:''}
+            </div>            </div>
 
             <!-- Signature -->
-            <div style="border-top:1px solid rgba(201,162,39,0.15);padding-top:14px;text-align:right;">
-                <div style="font-size:12px;color:var(--text3);margin-bottom:6px;">Cordialement,</div>
-                <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:8px;">
-                    Détective CID
+            <div style="margin-top:28px;border-top:1px solid rgba(201,162,39,0.2);padding-top:20px;">
+                <div style="display:flex;justify-content:flex-end;">
+                    <div style="text-align:center;min-width:280px;">
+                        <div style="font-size:12px;color:var(--text3);letter-spacing:1px;margin-bottom:16px;">Cordialement,</div>
+                        <!-- Ligne de signature -->
+                        <div style="border-bottom:1.5px solid rgba(201,162,39,0.5);margin:0 20px 6px;position:relative;">
+                            <div style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:40px;height:2px;background:rgba(201,162,39,0.3);border-radius:1px;"></div>
+                        </div>
+                        <!-- Titre fixe -->
+                        <div style="font-size:11px;font-weight:800;color:#C9A227;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Détective CID</div>
+                        <!-- Agents en style signature -->
+                        <div>
+                            ${(f.detective?f.detective.split('\n').filter(d=>d.trim()):[]).map((d,i)=>`
+                            <div style="font-family:'Georgia',serif;font-size:15px;font-style:italic;color:var(--text);padding:2px 0;line-height:1.5;">${depEsc(d)}</div>
+                            `).join('')}
+                            ${(!f.detective||!f.detective.trim())?`<div style="font-size:13px;color:var(--text3);font-style:italic;">— Aucun agent sélectionné —</div>`:''}
+                        </div>
+                    </div>
                 </div>
-                <textarea ${dis} oninput="depField('${id}','signature',this.value)" placeholder="Nom Prénom&#10;Matricule..." style="width:280px;max-width:100%;min-height:60px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:12px;font-weight:700;background:var(--input-bg);color:var(--text);text-align:right;resize:vertical;font-family:inherit;"></textarea>
-                <div style="font-size:11px;color:var(--text3);margin-top:4px;">Signature manuscrite</div>
             </div>
         </div>
     </div>`;
@@ -6386,7 +6414,7 @@ function printCidDeposition(id) {
             <div class="label">Activités illégales</div><div class="val">${f.activites||''}</div>
         </div>
         <div class="field">
-            <div class="question">Connaissez-vous la localisation de locaux d'autres groupes et de production de drogue ?</div>
+            <div class="question">Connaissez-vous la localisation de locaux d\'autres groupes et de production de drogue ?</div>
             <div class="label">Locaux / Production</div><div class="val">${f.locaux||''}</div>
         </div>
     </div>
@@ -6532,6 +6560,63 @@ async function pasteAllQR(id) {
         });
     }, 100);
     showSuccessDossiers(`✅ ${_copiedQR.length} Q/R collée(s) avec succès`);
+}
+
+// ===== GESTION DES AGENTS (DÉTECTIVES) =====
+async function depRemoveDetective(id, name) {
+    const dep = cidDepositions.find(d => d.id === id);
+    if (!dep) return;
+    const current = dep.form.detective ? dep.form.detective.split('\n').filter(d => d.trim() && d !== name) : [];
+    dep.form.detective = current.join('\n');
+    dep.modified_at = new Date().toLocaleDateString('fr-FR');
+    await saveCidDepositions();
+    const container = document.getElementById('mainDepositionContent');
+    if (container) renderDepositionEditor(container);
+    setTimeout(() => populateDetectiveSelect(id), 80);
+}
+
+async function populateDetectiveSelect(id) {
+    const dd = document.getElementById('det-dropdown-' + id);
+    if (!dd) return;
+    if (!_editorAccountsCache.length) await loadEditorAccounts();
+    const dep = cidDepositions.find(d => d.id === id);
+    const current = dep && dep.form.detective ? dep.form.detective.split('\n').filter(d => d.trim()) : [];
+    dd.innerHTML = _editorAccountsCache.map(a => {
+        const label = (a.grade||'') + ' | ' + (a.first_name||'') + ' ' + (a.last_name||'');
+        const checked = current.includes(label) ? 'checked' : '';
+        return `<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text);transition:background 0.1s;" onmouseover="this.style.background='rgba(201,162,39,0.08)'" onmouseout="this.style.background=''">
+            <input type="checkbox" value="${label}" ${checked} style="width:15px;height:15px;accent-color:#C9A227;cursor:pointer;">
+            <span>${label}</span>
+        </label>`;
+    }).join('');
+}
+
+function toggleDetDropdown(id) {
+    const dd = document.getElementById('det-dropdown-' + id);
+    if (!dd) return;
+    const isOpen = dd.style.display !== 'none';
+    dd.style.display = isOpen ? 'none' : 'block';
+    if (!isOpen) populateDetectiveSelect(id);
+}
+
+async function depConfirmDetectives(id) {
+    const dd = document.getElementById('det-dropdown-' + id);
+    if (!dd) return;
+    const dep = cidDepositions.find(d => d.id === id);
+    if (!dep) return;
+    const checked = [...dd.querySelectorAll('input[type=checkbox]:checked')].map(cb => cb.value);
+    dep.form.detective = checked.join('\n');
+    dep.modified_at = new Date().toLocaleDateString('fr-FR');
+    dd.style.display = 'none';
+    await saveCidDepositions();
+    const container = document.getElementById('mainDepositionContent');
+    if (container) renderDepositionEditor(container);
+    setTimeout(() => {
+        document.querySelectorAll('#mainDepositionContent textarea').forEach(ta => {
+            ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px';
+        });
+        populateDetectiveSelect(id);
+    }, 80);
 }
 
 // ===== SAUVEGARDE INTERROGATOIRE =====
@@ -6805,7 +6890,7 @@ function rapDelPhoto(id, bi, pi) {
 function renderRapportEditor(container) {
     const rap = cidRapports.find(r => r.id === currentRapportId);
     if (!rap) { currentRapportId = null; renderRapportsList(container); return; }
-    const canWrite = canEdit();
+    const canWrite = canEditDoc('rapport', rap.id);
     const f = rap.form || (rap.form = blankRapportForm());
     if (!f.agents || !f.agents.length) f.agents = [''];
     if (!f.photos) f.photos = [];
@@ -7026,7 +7111,8 @@ function getDocEditors(type, id) {
 
 function isDocEditor(type, id) {
     if (!currentUser) return false;
-    if (canDeleteDossier()) return true; // superviseurs ont toujours accès
+    // Master Investigator → Commanding : accès total en écriture partout
+    if (getPermLevel() === 'supervisor') return true;
     const editors = getDocEditors(type, id);
     return editors.includes(currentUser.username);
 }
@@ -7051,10 +7137,19 @@ function openEditorsModal(type, id, name) {
     document.getElementById('editorsModalTitle').textContent = '✏️ Éditeurs — ' + name;
     renderEditorsList(type, id);
     modal.classList.add('active');
-    loadEditorAccounts();
-    const inp = document.getElementById('editorUsernameInput');
-    if (inp) { inp.value = ''; setTimeout(() => inp.focus(), 150); }
+    loadEditorAccounts().then(() => populateEditorSelect(type, id));
 }
+function populateEditorSelect(type, id) {
+    const sel = document.getElementById('editorUsernameInput');
+    if (!sel) return;
+    const currentEditors = getDocEditors(type, id);
+    sel.innerHTML = '<option value="">-- Choisir un compte --</option>' +
+        _editorAccountsCache
+            .filter(a => !currentEditors.includes(a.username))
+            .map(a => `<option value="${a.username}">${a.first_name||''} ${a.last_name||''} (@${a.username}) — ${a.grade||''}</option>`)
+            .join('');
+}
+
 function closeEditorsModal() {
     const m = document.getElementById('editorsModal');
     if (m) m.classList.remove('active');
@@ -7080,8 +7175,8 @@ async function addEditor() {
     const modal = document.getElementById('editorsModal');
     const input = document.getElementById('editorUsernameInput');
     if (!modal || !input) return;
-    const username = input.value.trim().replace(/^@/, '');
-    if (!username) return;
+    const username = input.value.trim();
+    if (!username) { alert('Veuillez sélectionner un compte'); return; }
     const type = modal.dataset.type, id = modal.dataset.docId;
     if (!_docEditors[type+':'+id]) _docEditors[type+':'+id] = [];
     if (_docEditors[type+':'+id].includes(username)) { alert('Cet utilisateur est déjà éditeur'); return; }
@@ -7093,6 +7188,8 @@ async function addEditor() {
     const btn = document.getElementById('editorsbtn-'+type+'-'+id);
     if (btn) { btn.textContent = getEditorsBtnLabel(type, id); btn.style.cssText = getEditorsBtnStyle(type, id); }
     showSuccessDossiers(`✅ @${username} peut maintenant modifier ce document`);
+    const _m = document.getElementById('editorsModal');
+    if (_m && _m.classList.contains('active')) { const _mt = _m.dataset.type, _mid = _m.dataset.docId; populateEditorSelect(_mt, _mid); }
 }
 async function removeEditor(type, id, idx) {
     if (!_docEditors[type+':'+id]) return;
@@ -7101,6 +7198,8 @@ async function removeEditor(type, id, idx) {
     renderEditorsList(type, id);
     const btn = document.getElementById('editorsbtn-'+type+'-'+id);
     if (btn) { btn.textContent = getEditorsBtnLabel(type, id); btn.style.cssText = getEditorsBtnStyle(type, id); }
+    const m = document.getElementById('editorsModal');
+    if (m && m.classList.contains('active')) populateEditorSelect(type, id);
 }
 
 // ===== AUTOCOMPLÉTION ÉDITEURS =====
@@ -7147,6 +7246,8 @@ document.addEventListener('click', e => {
     const box = document.getElementById('editorSuggestions');
     const inp = document.getElementById('editorUsernameInput');
     if (box && inp && !inp.contains(e.target) && !box.contains(e.target)) box.style.display = 'none';
+    // Fermer tous les dropdowns détective
+    document.querySelectorAll('[id^="det-dropdown-"]').forEach(dd => { if (!dd.contains(e.target) && !e.target.closest('[onclick*="toggleDetDropdown"]')) dd.style.display = 'none'; });
 });
 
 // ===== MÉTADONNÉES RAPPORTS =====
@@ -7363,7 +7464,7 @@ function exportInterroPDF(id) {
         <div class="question">3. Quel est le véhicule du groupe — marques et couleurs ?</div>
         <div class="question">4. Quel est le signe vestimentaire distinctif du groupe ?</div>
         <div class="question">5. Quelles sont les activités illégales connues de votre groupe ?</div>
-        <div class="question">6. Connaissez-vous la localisation de locaux d'autres groupes et de production de drogue ?</div>
+        <div class="question">6. Connaissez-vous la localisation de locaux d\'autres groupes et de production de drogue ?</div>
     </div>
 
     <div class="section">
